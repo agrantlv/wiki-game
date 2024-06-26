@@ -131,7 +131,7 @@ let compare_connection
   ~(person : Person.t)
   =
   match connection with
-  | (a, b) ->
+  | a, b ->
     (match String.equal person a with true -> Some (a, b) | false -> None)
 ;;
 
@@ -144,27 +144,46 @@ let find_friends network ~person ~(visited : Person.t list) : Person.t list =
          ~f:(compare_connection ~person))
   in
   List.filter_map tuple_list ~f:(fun person_tuple ->
-    match person_tuple with 
-    | (_a, b) -> 
-      match (List.exists visited ~f:(fun name -> (String.equal b name))) with 
-      | true -> Some b
-      | false -> None )
+    match person_tuple with
+    | _a, b ->
+      (match List.exists visited ~f:(fun name -> String.equal b name) with
+       | false -> Some b
+       | true -> None))
 ;;
 
-let rec find_friend_group_rec cur_list (person_q : Person.t Queue.t) : Person.t list = 
-  match (Queue.dequeue person_q) with
-  | Some person -> Queue.enqueue_all
-  | 
-  
+let rec find_friend_group_rec
+  network
+  ~person
+  ~visited
+  ~(person_q : Person.t Queue.t)
+  : Person.t list
+  =
+  (* print_s [%message (visited : string list)]; print_s [%message (person_q
+     : Person.t Queue.t)]; *)
+  match Queue.dequeue person_q with
+  | Some new_person ->
+    let new_visited = List.append visited [ new_person ] in
+    Queue.enqueue_all person_q (find_friends network ~person ~visited);
+    new_visited
+    @ find_friend_group_rec
+        network
+        ~person:new_person
+        ~visited:new_visited
+        ~person_q
+  | None -> []
 ;;
 
 (* [find_friend_group network ~person] returns a list of all people who are
    mutually connected to the provided [person] in the provided [network]. *)
 let find_friend_group network ~person : Person.t list =
-  let (person_q : Person.t Queue.t) = Queue.create in
-  let visited = [person] in
+  let (person_q : Person.t Queue.t) = Queue.create () in
+  (* make this a set*)
+  let visited = [ person ] in
   Queue.enqueue_all person_q (find_friends network ~person ~visited);
-  find_friend_group_rec [] person_q
+  (* find_friend_group_rec network ~person ~visited ~person_q *)
+  List.dedup_and_sort
+    (find_friend_group_rec network ~person ~visited ~person_q)
+    ~compare:(fun a b -> String.compare a b)
 ;;
 
 (* start with a person, get their connections, enqueue those connections to a

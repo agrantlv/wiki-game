@@ -1,4 +1,23 @@
 open! Core
+module Article = String
+  (* We can represent our social network graph as a set of connections, where
+     a connection represents a friendship between two people. *)
+  module Connection = struct
+    module T = struct
+      type t = Article.t * Article.t [@@deriving compare, sexp]
+    end
+
+    (* This funky syntax is necessary to implement sets of [Connection.t]s.
+       This is needed to defined our [Network.t] type later. Using this
+       [Comparable.Make] functor also gives us immutable maps, which might
+       come in handy later. *)
+    include Comparable.Make (T)
+    include T
+
+  end
+
+
+
 
 (* [get_linked_articles] should return a list of wikipedia article lengths contained in
    the input.
@@ -45,17 +64,65 @@ let print_links_command =
         List.iter (get_linked_articles contents) ~f:print_endline]
 ;;
 
+
+(* NOT SURE IF CORRECT *)
+module G = Graph.Imperative.Graph.Concrete (String)
+
+(* We extend our [Graph] structure with the [Dot] API so that we can easily
+   render constructed graphs. Documentation about this API can be found here:
+   https://github.com/backtracking/ocamlgraph/blob/master/src/dot.mli *)
+module Dot = Graph.Graphviz.Dot (struct
+    include G
+
+    (* These functions can be changed to tweak the appearance of the
+       generated graph. Check out the ocamlgraph graphviz API
+       (https://github.com/backtracking/ocamlgraph/blob/master/src/graphviz.mli)
+       for examples of what values can be set here. *)
+    let edge_attributes _ = [ `Dir `None ]
+    let default_edge_attributes _ = []
+    let get_subgraph _ = None
+    let vertex_attributes v = [ `Shape `Box; `Label v; `Fillcolor 1000 ]
+    let vertex_name v = v
+    let default_vertex_attributes _ = []
+    let graph_attributes _ = []
+  end)
+
+
+
+
+
+let rec visualize_rec ~max_depth ~current_depth ~visited ~contents ~how_to_fetch () : unit = 
+  if current_depth > max_depth then ()
+  else
+    (* RECURSE *)
+    
+    ()
+;;
+
 (* [visualize] should explore all linked articles up to a distance of [max_depth] away
    from the given [origin] article, and output the result as a DOT file. It should use the
    [how_to_fetch] argument along with [File_fetcher] to fetch the articles so that the
    implementation can be tested locally on the small dataset in the ../resources/wiki
    directory. *)
+   (* origin: original name of wikipedia article 
+      output file: file where to put result in
+      how to fetch: kinda confused. 
+   *)
 let visualize ?(max_depth = 3) ~origin ~output_file ~how_to_fetch () : unit =
-  ignore (max_depth : int);
+  (* ignore (max_depth : int);
   ignore (origin : string);
   ignore (output_file : File_path.t);
   ignore (how_to_fetch : File_fetcher.How_to_fetch.t);
-  failwith "TODO"
+  failwith "TODO" *)
+  let contents = File_fetcher.fetch_exn how_to_fetch ~resource:origin in
+  let visited = Set.empty (module Connection) in
+  visualize_rec ~max_depth ~current_depth:0 ~visited ~contents ~how_to_fetch ();
+  let graph = G.create () in
+  Set.iter visited ~f:(fun (website1, website2) ->
+          (* [G.add_edge] auomatically adds the endpoints as vertices in the
+             graph if they don't already exist. *)
+      G.add_edge graph website1 website2);
+  Dot.output_graph (Out_channel.create (File_path.to_string output_file)) graph;
 ;;
 
 let visualize_command =
