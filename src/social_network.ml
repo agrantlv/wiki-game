@@ -16,6 +16,7 @@ module Network = struct
        [Comparable.Make] functor also gives us immutable maps, which might
        come in handy later. *)
     include Comparable.Make (T)
+    include T
 
     let of_string s =
       match String.split s ~on:',' with
@@ -125,14 +126,52 @@ let visualize_command =
 (* let find_friends_recurse network ~person ~(visited : Person.t list) :
    Person.t list = ignore (network : Network.t); ignore visited; ignore
    (person : Person.t); failwith "TODO" ;; *)
+let compare_connection
+  (connection : Network.Connection.t)
+  ~(person : Person.t)
+  =
+  match connection with
+  | (a, b) ->
+    (match String.equal person a with true -> Some (a, b) | false -> None)
+;;
+
+let find_friends network ~person ~(visited : Person.t list) : Person.t list =
+  let tuple_list =
+    Set.to_list
+      (Set.filter_map
+         (module Network.Connection)
+         network
+         ~f:(compare_connection ~person))
+  in
+  List.filter_map tuple_list ~f:(fun person_tuple ->
+    match person_tuple with 
+    | (_a, b) -> 
+      match (List.exists visited ~f:(fun name -> (String.equal b name))) with 
+      | true -> Some b
+      | false -> None )
+;;
+
+let rec find_friend_group_rec cur_list (person_q : Person.t Queue.t) : Person.t list = 
+  match (Queue.dequeue person_q) with
+  | Some person -> Queue.enqueue_all
+  | 
+  
+;;
 
 (* [find_friend_group network ~person] returns a list of all people who are
    mutually connected to the provided [person] in the provided [network]. *)
 let find_friend_group network ~person : Person.t list =
-  ignore (network : Network.t);
-  ignore (person : Person.t);
-  failwith "TODO"
+  let (person_q : Person.t Queue.t) = Queue.create in
+  let visited = [person] in
+  Queue.enqueue_all person_q (find_friends network ~person ~visited);
+  find_friend_group_rec [] person_q
 ;;
+
+(* start with a person, get their connections, enqueue those connections to a
+   queue while the queue isn't empty, find all unique connections, enqueue
+   them into the queue Idea: to get all friends for a single person, find
+   everyone theyre connected with, then use List.exists or something with the
+   list filter function to filter out seen people *)
 
 (* find_friends_recurse network ~person ~visited:[] *)
 

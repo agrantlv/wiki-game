@@ -309,7 +309,7 @@ You should also test your implementation by running it on an IMDB page of your c
 ```
 $ dune exec ./bin/wiki_game.exe -- imdb print-credits -resource https://www.imdb.com/name/nm0000706/?ref_=fn_al_nm_1
 Crazy Rich Asians
-Crouching Tiger, Hidden Dragon
+Crouching Tiger, Hidden Dragon 
 Everything Everywhere All at Once
 Tomorrow Never Dies
 ```
