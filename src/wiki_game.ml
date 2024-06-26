@@ -90,12 +90,37 @@ module Dot = Graph.Graphviz.Dot (struct
 
 
 
-
+(* GAMEPLAN:
+   get list of linked articles from contents BOOM
+   iterate over list, calling visualize_rec and adding +1 to the current_depth BOOM
+   during recursion, add link to set (figure out how to get name later) BOOM
+ *)
 let rec visualize_rec ~max_depth ~current_depth ~visited ~contents ~how_to_fetch () : unit = 
   if current_depth > max_depth then ()
   else
-    (* RECURSE *)
-    
+    let linked_articles_list = get_linked_articles contents in
+    List.iter linked_articles_list ~f:(fun article ->
+      let new_contents = File_fetcher.fetch_exn how_to_fetch ~resource:article in
+      Hash_set.add visited new_contents;
+      if not (Hash_set.exists visited ~f:(fun article_from_set -> String.equal article_from_set article)) then
+        visualize_rec ~max_depth ~current_depth:(current_depth + 1) ~visited
+      );
+
+
+
+(* 
+    match Queue.dequeue person_q with
+  | Some new_person ->
+    let new_visited = List.append visited [ new_person ] in
+    Queue.enqueue_all person_q (find_friends network ~person ~visited);
+    new_visited
+    @ visualize_rec
+        ~max_depth
+        ~current_depth:(current_depth + 1)
+        ~visited *)
+
+  | None -> []
+
     ()
 ;;
 
@@ -115,7 +140,8 @@ let visualize ?(max_depth = 3) ~origin ~output_file ~how_to_fetch () : unit =
   ignore (how_to_fetch : File_fetcher.How_to_fetch.t);
   failwith "TODO" *)
   let contents = File_fetcher.fetch_exn how_to_fetch ~resource:origin in
-  let visited = Set.empty (module Connection) in
+  let visited = Hash_set.create (module Connection) in
+  Set.add visited origin;
   visualize_rec ~max_depth ~current_depth:0 ~visited ~contents ~how_to_fetch ();
   let graph = G.create () in
   Set.iter visited ~f:(fun (website1, website2) ->
