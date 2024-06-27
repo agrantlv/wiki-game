@@ -144,8 +144,6 @@ let visualize ?(max_depth = 3) ~origin ~output_file ~how_to_fetch () : unit =
   let visited = Hash_set.create (module Connection) in
   visualize_rec ~max_depth ~current_depth:0 ~visited ~origin ~how_to_fetch ();
 
-
-
   let graph = G.create () in
   Hash_set.iter visited ~f:(fun (website1, website2) ->
       let new_website_1 = 
