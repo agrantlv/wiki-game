@@ -91,6 +91,7 @@ let rec solve_maze_rec
    a hash map that replaces the characters with an X or something *)
 let solve_maze unsolved_maze_list : string list =
   let num_rows = List.length unsolved_maze_list in
+  let num_cols = String.length (List.hd_exn unsolved_maze_list) in
   let empty_map = Map.empty (module Location) in
   (* let maze_map = create_maze_map ~map:empty_map ~unsolved_maze_list in *)
   (* let maze_map = List.folding_mapi unsolved_maze_list empty_map
@@ -98,8 +99,8 @@ let solve_maze unsolved_maze_list : string list =
   let maze_map =
     create_maze_map_rows ~map:empty_map ~unsolved_maze_list ~row:0
   in
-  let maze_start = 0, 0 in
-  let maze_end = 0, 0 in
+  let maze_start = 1, 0 in
+  let maze_end = 0, 16 in
   let path_stack = Stack.create () in
   let cur_path = [ maze_start ] in
   Stack.push path_stack maze_start;
@@ -118,6 +119,7 @@ let solve_maze unsolved_maze_list : string list =
       ~num_rows
       ~num_cols
   in
+  print_endline "Solution: ";
   List.iter loc_list ~f:(fun location ->
     print_s [%message (location : int * int)]);
   unsolved_maze_list
