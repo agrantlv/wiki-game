@@ -178,6 +178,8 @@ let rec find_friend_group_rec
 let find_friend_group network ~person : Person.t list =
   let (person_q : Person.t Queue.t) = Queue.create () in
   (* make this a set*)
+  (* let visited = Set.empty (module Person) in let visited = Set.add visited
+     person; *)
   let visited = [ person ] in
   Queue.enqueue_all person_q (find_friends network ~person ~visited);
   (* find_friend_group_rec network ~person ~visited ~person_q *)

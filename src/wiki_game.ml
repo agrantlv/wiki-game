@@ -13,10 +13,9 @@ module Article = String
        come in handy later. *)
     include Comparable.Make (T)
     include T
+    let hash _t = 1 
 
   end
-
-
 
 
 (* [get_linked_articles] should return a list of wikipedia article lengths contained in
@@ -89,39 +88,38 @@ module Dot = Graph.Graphviz.Dot (struct
 
 
 
+let clean_token website : string =
+  let no_first_slash = match (String.chop_prefix website ~prefix:"/") with
+  | Some str -> str
+  | None -> website
+in
+let no_wiki = match (String.chop_prefix no_first_slash ~prefix:"wiki/") with
+      | Some new_str -> new_str
+      | None -> no_first_slash
+in
+String.filter no_wiki ~f:(fun ch -> ((Char.is_alphanum ch) || (Char.is_whitespace ch)))
+;;
+
+
 
 (* GAMEPLAN:
    get list of linked articles from contents BOOM
    iterate over list, calling visualize_rec and adding +1 to the current_depth BOOM
    during recursion, add link to set (figure out how to get name later) BOOM
  *)
-let rec visualize_rec ~max_depth ~current_depth ~visited ~contents ~how_to_fetch () : unit = 
+let rec visualize_rec ~max_depth ~current_depth ~visited ~origin ~how_to_fetch () : unit = 
   if current_depth > max_depth then ()
   else
+    let contents = File_fetcher.fetch_exn how_to_fetch ~resource:origin in
     let linked_articles_list = get_linked_articles contents in
     List.iter linked_articles_list ~f:(fun article ->
-      let new_contents = File_fetcher.fetch_exn how_to_fetch ~resource:article in
-      Hash_set.add visited new_contents;
-      if not (Hash_set.exists visited ~f:(fun article_from_set -> String.equal article_from_set article)) then
-        visualize_rec ~max_depth ~current_depth:(current_depth + 1) ~visited
+      Hash_set.add visited (origin, article);
+      if not (Hash_set.exists visited ~f:(fun article_from_set -> 
+        match article_from_set with 
+        | (a, _b) -> 
+        String.equal a article)) then
+        visualize_rec ~max_depth ~current_depth:(current_depth + 1) ~visited ~origin:article ~how_to_fetch ()
       );
-
-
-
-(* 
-    match Queue.dequeue person_q with
-  | Some new_person ->
-    let new_visited = List.append visited [ new_person ] in
-    Queue.enqueue_all person_q (find_friends network ~person ~visited);
-    new_visited
-    @ visualize_rec
-        ~max_depth
-        ~current_depth:(current_depth + 1)
-        ~visited *)
-
-  | None -> []
-
-    ()
 ;;
 
 (* [visualize] should explore all linked articles up to a distance of [max_depth] away
@@ -139,15 +137,26 @@ let visualize ?(max_depth = 3) ~origin ~output_file ~how_to_fetch () : unit =
   ignore (output_file : File_path.t);
   ignore (how_to_fetch : File_fetcher.How_to_fetch.t);
   failwith "TODO" *)
-  let contents = File_fetcher.fetch_exn how_to_fetch ~resource:origin in
+  (* let contents = File_fetcher.fetch_exn how_to_fetch ~resource:origin in
   let visited = Hash_set.create (module Connection) in
-  Set.add visited origin;
-  visualize_rec ~max_depth ~current_depth:0 ~visited ~contents ~how_to_fetch ();
+  Hash_set.add visited origin;
+  visualize_rec ~max_depth ~current_depth:0 ~visited ~contents ~how_to_fetch (); *)
+  let visited = Hash_set.create (module Connection) in
+  visualize_rec ~max_depth ~current_depth:0 ~visited ~origin ~how_to_fetch ();
+
+
+
   let graph = G.create () in
-  Set.iter visited ~f:(fun (website1, website2) ->
+  Hash_set.iter visited ~f:(fun (website1, website2) ->
+      let new_website_1 = 
+        clean_token 
+        website1 in
+      let new_website_2 = 
+        clean_token 
+        website2 in
           (* [G.add_edge] auomatically adds the endpoints as vertices in the
              graph if they don't already exist. *)
-      G.add_edge graph website1 website2);
+      G.add_edge graph new_website_1 new_website_2);
   Dot.output_graph (Out_channel.create (File_path.to_string output_file)) graph;
 ;;
 
