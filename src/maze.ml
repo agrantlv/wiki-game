@@ -67,7 +67,7 @@ let rec solve_maze_rec
   ~map:maze_map
   ~maze_end
   ~num_rows
-  ~num_cols (* : Location.t list option *)
+  ~num_cols 
   ~cur_loc
   ~visited
   : Location.t list option
