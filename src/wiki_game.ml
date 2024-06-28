@@ -13,7 +13,7 @@ module Article = String
        come in handy later. *)
     include Comparable.Make (T)
     include T
-    let hash _t = 1 
+    let hash t = match t with (a, _b) -> String.hash a
 
   end
 
@@ -183,6 +183,30 @@ let visualize_command =
         printf !"Done! Wrote dot file to %{File_path}\n%!" output_file]
 ;;
 
+let rec find_path_rec ~cur_depth ~visited ~destination ~queue ~how_to_fetch () : (Article.t list option) = 
+  
+  match Queue.dequeue queue with 
+| Some article -> 
+(
+    if Article.equal article destination then
+      Some [destination]
+    else if cur_depth <= 0 then
+      None
+    else
+      let contents = File_fetcher.fetch_exn how_to_fetch ~resource:article in
+      let neighbor_articles = get_linked_articles contents in
+      print_s [%message (neighbor_articles : string list)]; 
+      List.iter neighbor_articles ~f:(fun neighbor_article -> 
+        if not (Hash_set.exists visited ~f:(fun visit -> Article.equal visit neighbor_article)) then 
+          Queue.enqueue queue (File_fetcher.fetch_exn how_to_fetch ~resource:neighbor_article) );
+        match find_path_rec ~cur_depth:(cur_depth - 1) ~visited ~destination ~queue ~how_to_fetch () with
+        | Some article_list -> Some ([article] @ article_list)
+        | None -> None
+)
+  | None -> None
+;;
+
+
 (* [find_path] should attempt to find a path between the origin article and the
    destination article via linked articles.
 
@@ -192,11 +216,10 @@ let visualize_command =
 
    [max_depth] is useful to limit the time the program spends exploring the graph. *)
 let find_path ?(max_depth = 3) ~origin ~destination ~how_to_fetch () =
-  ignore (max_depth : int);
-  ignore (origin : string);
-  ignore (destination : string);
-  ignore (how_to_fetch : File_fetcher.How_to_fetch.t);
-  failwith "TODO"
+  let (article_q : Article.t Queue.t) = Queue.create () in
+  let visited = Hash_set.create (module Article) in
+  Queue.enqueue article_q origin;
+  find_path_rec ~cur_depth:max_depth ~visited ~queue:article_q ~destination ~how_to_fetch () 
 ;;
 
 let find_path_command =
