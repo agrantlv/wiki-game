@@ -3,8 +3,6 @@ module Row = Int
 module Col = Int
 
 module Location = struct
-  type key = char [@@deriving compare, sexp]
-
   module T = struct
     type t = Row.t * Col.t [@@deriving compare, sexp]
   end
@@ -42,47 +40,67 @@ let in_bounds ~cur_row ~cur_col ~num_rows ~num_cols =
   cur_row < num_rows && cur_row >= 0 && cur_col < num_cols && cur_col >= 0
 ;;
 
-let find_neighbors ~map ~loc ~num_rows ~num_cols : Location.t list =
+let find_neighbors ~map ~loc ~num_rows ~num_cols ~visited : Location.t list =
   match loc with
   | row, col ->
     let potential_list =
       [ row + 1, col; row - 1, col; row, col + 1; row, col - 1 ]
     in
-    List.filter potential_list ~f:(fun cur_loc ->
-      match cur_loc with
-      | cur_row, cur_col ->
-        in_bounds ~cur_row ~cur_col ~num_rows ~num_cols
-        && not (Char.equal (Map.find_exn map cur_loc) '#'))
+    (* print_endline "Potential list: "; List.iter potential_list ~f:(fun
+       location -> print_s [%message (location : int * int)]); *)
+    let new_list =
+      List.filter potential_list ~f:(fun cur_loc ->
+        match cur_loc with
+        | cur_row, cur_col ->
+          in_bounds ~cur_row ~cur_col ~num_rows ~num_cols
+          && (not (Char.equal (Map.find_exn map cur_loc) '#'))
+          && not
+               (Set.exists visited ~f:(fun path_loc ->
+                  Location.equal cur_loc path_loc)))
+    in
+    (* print_endline "new list after find neighbors"; List.iter new_list
+       ~f:(fun location -> print_s [%message (location : int * int)]); *)
+    new_list
 ;;
 
 let rec solve_maze_rec
   ~map:maze_map
-  ~maze_start
   ~maze_end
-  ~(cur_path : Location.t list)
-  ~(path_stack : Location.t Stack.t)
   ~num_rows
-  ~num_cols
+  ~num_cols (* : Location.t list option *)
+  ~cur_loc
+  ~visited
+  : Location.t list option
   =
-  match Stack.pop path_stack with
-  | Some cur_loc ->
-    if Location.equal cur_loc maze_end
-    then cur_path
-    else (
-      let valid_neighbors =
-        find_neighbors ~map:maze_map ~loc:cur_loc ~num_rows ~num_cols
-      in
-      List.iter valid_neighbors ~f:(fun neighbor_loc ->
-        Stack.push path_stack neighbor_loc);
-      solve_maze_rec
-        ~map:maze_map
-        ~maze_start
-        ~maze_end
-        ~cur_path:(List.append cur_path [ cur_loc ])
-        ~path_stack
-        ~num_rows
-        ~num_cols)
-  | None -> cur_path
+  (* print_endline "Stack: inside rec "; Stack.iter path_stack ~f:(fun
+     location -> print_s [%message (location : int * int)]); *)
+  if Location.equal cur_loc maze_end
+  then Some [ maze_end ]
+  else (
+    let valid_neighbors =
+      find_neighbors ~map:maze_map ~loc:cur_loc ~num_rows ~num_cols ~visited
+    in
+    if List.is_empty valid_neighbors
+    then None
+    else
+      List.find_map valid_neighbors ~f:(fun neighbor_loc ->
+        match
+          solve_maze_rec
+            ~map:maze_map
+            ~maze_end
+            ~num_rows
+            ~num_cols
+            ~cur_loc:neighbor_loc
+            ~visited:(Set.add visited cur_loc)
+        with
+        | Some loc_list -> Some ([ cur_loc ] @ loc_list)
+        | None -> None))
+;;
+
+let find_char ~maze_map ~ch : Location.t =
+  let key_list = Map.keys maze_map in
+  List.find_exn key_list ~f:(fun key ->
+    Char.equal (Map.find_exn maze_map key) ch)
 ;;
 
 (* Gameplan: create a map that takes a row, col and gets a char associated
@@ -99,30 +117,42 @@ let solve_maze unsolved_maze_list : string list =
   let maze_map =
     create_maze_map_rows ~map:empty_map ~unsolved_maze_list ~row:0
   in
-  let maze_start = 1, 0 in
-  let maze_end = 0, 16 in
-  let path_stack = Stack.create () in
-  let cur_path = [ maze_start ] in
-  Stack.push path_stack maze_start;
+  let maze_start = find_char ~maze_map ~ch:'S' in
+  let maze_end = find_char ~maze_map ~ch:'E' in
+  let visited = Set.empty (module Location) in
+  (* *)
+  (* print_endline "starting neighbors: "; List.iter starting_neighbors
+     ~f:(fun location -> print_s [%message (location : int * int)]); *)
+  (* *)
   (* testing *)
-  Map.iteri maze_map ~f:(fun ~key ~data ->
-    print_s [%message (key : int * int)];
-    print_s [%message (data : char)]);
+  (* print_endline "Stack: outside rec "; Stack.iter path_stack ~f:(fun
+     location -> print_s [%message (location : int * int)]); *)
+  (* Map.iteri maze_map ~f:(fun ~key ~data -> print_s [%message (key : int *
+     int)]; print_s [%message (data : char)]); *)
   (* end testing*)
   let loc_list =
-    solve_maze_rec
-      ~map:maze_map
-      ~maze_start
-      ~maze_end
-      ~cur_path
-      ~path_stack
-      ~num_rows
-      ~num_cols
+    match
+      solve_maze_rec
+        ~map:maze_map
+        ~cur_loc:maze_start
+        ~maze_end
+        ~visited
+        ~num_rows
+        ~num_cols
+    with
+    | Some thing -> thing
+    | None -> []
   in
-  print_endline "Solution: ";
-  List.iter loc_list ~f:(fun location ->
-    print_s [%message (location : int * int)]);
-  unsolved_maze_list
+  (* print_endline "Solution: "; List.iter loc_list ~f:(fun location ->
+     print_s [%message (location : int * int)]); *)
+  List.mapi unsolved_maze_list ~f:(fun map_row maze_str ->
+    String.mapi maze_str ~f:(fun map_col ch ->
+      if List.exists loc_list ~f:(fun loc ->
+           Location.equal loc (map_row, map_col))
+         && (not (Char.equal ch 'S'))
+         && not (Char.equal ch 'E')
+      then ' '
+      else ch))
 ;;
 
 let solve_command =
